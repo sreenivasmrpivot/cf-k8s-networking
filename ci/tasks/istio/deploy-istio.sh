@@ -12,8 +12,8 @@ set -euo pipefail
 function install_istio() {
   workspace=${PWD}
   export KUBECONFIG="${PWD}/kubeconfig/config"
-  istio_values_file="${PWD}/cf-k8s-networking/config/deps/istio-values.yaml"
-  grafana_values_file="${PWD}/cf-k8s-networking-ci/ci/istio-config/grafana-config.yaml"
+  istio_values_file="/Users/pivotal/workspace/cf-k8s-networking/config/deps/istio-values.yaml"
+  grafana_values_file="/Users/pivotal/workspace/cf-k8s-networking/ci/istio-config/grafana-config.yaml"
   custom_metrics_file="${PWD}/cf-k8s-networking/config/deps/istio-cfrequestcount.yaml"
 
   pushd istio > /dev/null
@@ -30,7 +30,8 @@ function install_istio() {
     helm template install/kubernetes/helm/istio --name istio --namespace istio-system \
       -f "${istio_values_file}"  \
       -f "${grafana_values_file}" \
-      | kubectl apply -f -
+      --set gateways.istio-ingressgateway.enabled=false \
+      | kubectl apply -f - -f /Users/pivotal/workspace/cf-k8s-networking/config/spike/ingressgateway-daemonset.yml
 
     # Install custom metrics
     kubectl apply -f "${custom_metrics_file}"
