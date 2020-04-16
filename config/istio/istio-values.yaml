@@ -2,18 +2,17 @@
 #@ load("@ytt:overlay", "overlay")
 #@ load("@ytt:yaml", "yaml")
 
-apiVersion: install.istio.io/v1alpha2
-kind: IstioControlPlane
+apiVersion: install.istio.io/v1alpha1
+kind: IstioOperatorSpec
 spec:
   profile: default
-  telemetry:
-    components:
-      telemetry:
-        k8s:
-          resources:
-            requests:
-              cpu: 100m
-              memory: 500Mi
+  components:
+    telemetry:
+      k8s:
+        resources:
+          requests:
+            cpu: 100m
+            memory: 500Mi
   values:
     gateways:
       istio-ingressgateway:
