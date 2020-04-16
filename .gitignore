@@ -6,6 +6,7 @@ bin/*.sh
 *.test
 *.swp
 /tmp
+/config/istio/tmp/
 *.iml
 .idea/
 tags
