@@ -13,6 +13,9 @@ spec:
           requests:
             cpu: 100m
             memory: 500Mi
+  meshConfig:
+    tcpKeepalive:
+      time: 300s
   values:
     gateways:
       istio-ingressgateway:
