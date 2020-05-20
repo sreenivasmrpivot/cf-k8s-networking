@@ -175,14 +175,24 @@ jobs:
           passed: [run-cfroutesync-units]
           trigger: true
         - get: cf-k8s-networking-ci
+    - put: initial-image
+      resource: cfroutesync-image
+      params:
+        build: cf-k8s-networking/cfroutesync
+        dockerfile: cf-k8s-networking/cfroutesync/deploy/Dockerfile
+      get_params:
+        save: true
     - task: build-tag-file
       file: cf-k8s-networking-ci/ci/tasks/docker/build-tag-file-for-image.yml
+    - task: build-image-labels
+      file: cf-k8s-networking-ci/ci/tasks/docker/build-image-labels.yml
     - put: cfroutesync-image
       params:
         build: cf-k8s-networking/cfroutesync
         dockerfile: cf-k8s-networking/cfroutesync/deploy/Dockerfile
         additional_tags: docker-info/tags
         tag_as_latest: true
+        labels_file: labels/labels.json
     - task: add-updated-digest
       file: cf-k8s-networking-ci/ci/tasks/docker/add-updated-digest.yml
       input_mapping:
@@ -214,23 +224,8 @@ jobs:
         save: true
     - task: build-tag-file
       file: cf-k8s-networking-ci/ci/tasks/docker/build-tag-file-for-image.yml
-    - task: annotate-image
-      config:
-        platform: linux
-        image_resource:
-          type: docker-image
-          source:
-            repository: gcr.io/cf-routing-desserts/ci-image-metadata-annotator
-            username: _json_key
-            password: ((gcp_gcr_desserts_service_account_key))
-        inputs:
-        - name: cf-k8s-networking
-        - name: initial-image
-        - name: cf-k8s-networking-ci
-        outputs:
-        - name: labels
-        run:
-          path: cf-k8s-networking-ci/ci/tasks/docker/generate-image-labels.sh
+    - task: build-image-labels
+      file: cf-k8s-networking-ci/ci/tasks/docker/build-image-labels.yml
     - put: routecontroller-image
       params:
         build: cf-k8s-networking/routecontroller
