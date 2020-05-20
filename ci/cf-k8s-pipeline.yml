@@ -42,7 +42,7 @@ resources:
   type: git
   icon: github-box
   source:
-    branch: master
+    branch: label-images
     private_key: ((github_private_key.private_key))
     uri: git@github.com:cloudfoundry/cf-k8s-networking.git
     paths:
@@ -211,7 +211,7 @@ jobs:
         build: cf-k8s-networking/routecontroller
         dockerfile: cf-k8s-networking/routecontroller/Dockerfile
       get_params:
-        rootfs: true
+        save: true
     - task: build-tag-file
       file: cf-k8s-networking-ci/ci/tasks/docker/build-tag-file-for-image.yml
     - task: annotate-image
@@ -230,7 +230,7 @@ jobs:
         outputs:
         - name: labels
         run:
-          path: cf-k8s-networking-ci/tasks/docker/generate-image-labels.sh
+          path: cf-k8s-networking-ci/ci/tasks/docker/generate-image-labels.sh
     - put: routecontroller-image
       params:
         build: cf-k8s-networking/routecontroller
