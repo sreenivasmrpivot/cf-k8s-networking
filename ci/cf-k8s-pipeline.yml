@@ -204,14 +204,40 @@ jobs:
           passed: [run-routecontroller-integration-tests]
           trigger: true
         - get: cf-k8s-networking-ci
+    # Note: this is not the final image. Just needed to get the docker image as a tarball to annotate.
+    - put: initial-image
+      resource: routecontroller-image
+      params:
+        build: cf-k8s-networking/routecontroller
+        dockerfile: cf-k8s-networking/routecontroller/Dockerfile
+      get_params:
+        rootfs: true
     - task: build-tag-file
       file: cf-k8s-networking-ci/ci/tasks/docker/build-tag-file-for-image.yml
+    - task: annotate-image
+      config:
+        platform: linux
+        image_resource:
+          type: docker-image
+          source:
+            repository: gcr.io/cf-routing-desserts/ci-image-metadata-annotator
+            username: _json_key
+            password: ((gcp_gcr_desserts_service_account_key))
+        inputs:
+        - name: cf-k8s-networking
+        - name: initial-image
+        - name: cf-k8s-networking-ci
+        outputs:
+        - name: labels
+        run:
+          path: cf-k8s-networking-ci/tasks/docker/generate-image-labels.sh
     - put: routecontroller-image
       params:
         build: cf-k8s-networking/routecontroller
         dockerfile: cf-k8s-networking/routecontroller/Dockerfile
         additional_tags: docker-info/tags
         tag_as_latest: true
+        labels_file: labels/labels.json
     - task: add-updated-digest
       file: cf-k8s-networking-ci/ci/tasks/docker/add-updated-digest.yml
       input_mapping:
