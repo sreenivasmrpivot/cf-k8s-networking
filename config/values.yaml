@@ -3,7 +3,7 @@
 #! Default values for cf-k8s-networking.
 #! This is a YTT-formatted file.
 
-systemNamespace: cf-system
+systemNamespace: default
 workloadsNamespace: cf-workloads
 
 cfroutesync:

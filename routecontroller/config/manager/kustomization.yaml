@@ -1,2 +1,8 @@
 resources:
 - manager.yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+images:
+- digest: sha256:717940947ac6b90ccf17a202b5e8eec58388c211dfa26495503471442f5a7202
+  name: controller
+  newName: gcr.io/cf-networking-images/cf-k8s-networking/routecontroller
