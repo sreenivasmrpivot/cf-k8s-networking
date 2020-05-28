@@ -1,6 +1,7 @@
 package stress_test
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -60,6 +61,7 @@ func (k kubectlRunner) RunWithStdin(stdin io.Reader, kubectlCommandArgs ...strin
 }
 
 func (k kubectlRunner) generateCommand(stdin io.Reader, kubectlCommandArgs ...string) *exec.Cmd {
+	fmt.Fprintf(GinkgoWriter, "+ kubectl %s\n", strings.Join(kubectlCommandArgs, " "))
 	cmd := exec.Command("kubectl", kubectlCommandArgs...)
 	cmd.Env = append(cmd.Env, "KUBECONFIG="+k.kubeconfigFilePath)
 	if stdin != nil {
@@ -88,6 +90,7 @@ type yttRunner struct {
 }
 
 func (y yttRunner) Run(yttCommandArgs ...string) (*gexec.Session, error) {
+	fmt.Fprintf(GinkgoWriter, "+ ytt %s\n", strings.Join(yttCommandArgs, " "))
 	cmd := exec.Command("ytt", yttCommandArgs...)
 	return gexec.Start(cmd, GinkgoWriter, GinkgoWriter)
 }
