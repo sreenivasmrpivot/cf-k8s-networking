@@ -12,7 +12,7 @@ import (
 //    "kubeconfig_path": "/Users/user/.kube/config",
 //    "api": "api.example.com",
 //    "admin_user": "admin",
-//    "admin_password": "PASSWORD"
+//    "admin_password": "PASSWORD",
 //    "apps_domain": "example.com"
 //  }
 type Config struct {
