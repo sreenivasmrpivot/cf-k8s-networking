@@ -103,6 +103,10 @@ func (g *Globals) Deserialize(data []byte) error {
 	return json.Unmarshal(data, g)
 }
 
+type Config struct {
+	AppsDomain string `json:"apps_domain"`
+}
+
 type KubeCtl struct {
 	kubeConfigPath string
 }
@@ -162,4 +166,13 @@ func pushProxy(name string, flags ...string) string {
 
 func pushApp(name string) string {
 	return pushDockerApp(name, "cfrouting/httpbin8080")
+}
+
+func mapRoute(appName, domain, hostname string) {
+	session := cf.Cf("map-route",
+		appName,
+		domain,
+		"--hostname", hostname,
+	)
+	Expect(session.Wait(120 * time.Second)).To(gexec.Exit())
 }

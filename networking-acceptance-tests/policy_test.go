@@ -16,10 +16,6 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-type Config struct {
-	AppsDomain string `json:"apps_domain"`
-}
-
 var _ = Describe("Policy and mesh connectivity", func() {
 	var (
 		app1name string
