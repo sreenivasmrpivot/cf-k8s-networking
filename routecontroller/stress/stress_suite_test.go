@@ -1,13 +1,14 @@
 package stress_test
 
 import (
+	"io"
 	"os"
 	"os/exec"
 	"testing"
+	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	. "github.com/onsi/gomega/gbytes"
 	"github.com/onsi/gomega/gexec"
 )
 
@@ -28,12 +29,14 @@ var _ = BeforeSuite(func() {
 	kubectl = kubectlRunner{kubeconfigFilePath: kubeconfigFromEnv}
 
 	// Deploy Route CRD
-	Expect(kubectl.Run("apply", "-f", "../../config/crd/networking.cloudfoundry.org_routes.yaml")).
-		To(Say("success")) // TODO figure out real success message
+	session, err := kubectl.Run("apply", "-f", "../../config/crd/networking.cloudfoundry.org_routes.yaml")
+	Expect(err).NotTo(HaveOccurred())
+	Eventually(session, 1*time.Minute).Should(gexec.Exit(0))
 
 	// Deploy Istio's Virtual Service CRD
-	Expect(kubectl.Run("apply", "-f", "../integration/fixtures/istio-virtual-service.yaml")).
-		To(Say("success"))
+	session, err = kubectl.Run("apply", "-f", "../integration/fixtures/istio-virtual-service.yaml")
+	Expect(err).NotTo(HaveOccurred())
+	Eventually(session, 1*time.Minute).Should(gexec.Exit(0))
 })
 
 type kubectlRunner struct {
@@ -41,8 +44,21 @@ type kubectlRunner struct {
 }
 
 func (k kubectlRunner) Run(kubectlCommandArgs ...string) (*gexec.Session, error) {
+	cmd := k.generateCommand(nil, kubectlCommandArgs...)
+	return gexec.Start(cmd, GinkgoWriter, GinkgoWriter)
+}
+
+func (k kubectlRunner) RunWithStdin(stdin io.Reader, kubectlCommandArgs ...string) (*gexec.Session, error) {
+	cmd := k.generateCommand(stdin, kubectlCommandArgs...)
+	return gexec.Start(cmd, GinkgoWriter, GinkgoWriter)
+}
+
+func (k kubectlRunner) generateCommand(stdin io.Reader, kubectlCommandArgs ...string) *exec.Cmd {
 	cmd := exec.Command("kubectl", kubectlCommandArgs...)
 	cmd.Env = append(cmd.Env, "KUBECONFIG="+k.kubeconfigFilePath)
+	if stdin != nil {
+		cmd.Stdin = stdin
+	}
 
-	return gexec.Start(cmd, GinkgoWriter, GinkgoWriter)
+	return cmd
 }
