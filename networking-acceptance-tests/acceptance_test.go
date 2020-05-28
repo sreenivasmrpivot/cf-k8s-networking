@@ -136,12 +136,18 @@ func destroySystemComponent() {
 	session.Wait(1 * time.Minute)
 }
 
-func pushDockerApp(name string, container string) string {
-	session := cf.Cf("push",
-		name,
-		"-o", container,
-		"-u", "http",
+func pushDockerApp(name string, container string, flags ...string) string {
+	args := append(
+		[]string{"push",
+			name,
+			"-o", container,
+			"-u", "http",
+		},
+		flags...,
 	)
+
+	session := cf.Cf(args...)
+
 	// cf push does not exit 0 on cf-for-k8s yet because logcache is unreliable (stats server error)
 	Expect(session.Wait(120 * time.Second)).To(gexec.Exit())
 
@@ -150,8 +156,8 @@ func pushDockerApp(name string, container string) string {
 	return guid
 }
 
-func pushProxy(name string) string {
-	return pushDockerApp(name, "cfrouting/proxy")
+func pushProxy(name string, flags ...string) string {
+	return pushDockerApp(name, "cfrouting/proxy", flags...)
 }
 
 func pushApp(name string) string {
