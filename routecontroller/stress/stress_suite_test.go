@@ -4,6 +4,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"strings"
 	"testing"
 	"time"
 
@@ -17,9 +18,14 @@ func TestStress(t *testing.T) {
 	RunSpecs(t, "Route Controller Stress Tests Suite")
 }
 
-var kubectl kubectlRunner
+var (
+	kubectl kubectlRunner
+	ytt     yttRunner
+)
 
 var _ = BeforeSuite(func() {
+	SetDefaultEventuallyTimeout(5 * time.Minute)
+
 	kubeconfigFromEnv := os.Getenv("KUBECONFIG")
 	if kubeconfigFromEnv == "" {
 		// TODO: Default to $HOME/.kube/config ?
@@ -31,12 +37,12 @@ var _ = BeforeSuite(func() {
 	// Deploy Route CRD
 	session, err := kubectl.Run("apply", "-f", "../../config/crd/networking.cloudfoundry.org_routes.yaml")
 	Expect(err).NotTo(HaveOccurred())
-	Eventually(session, 1*time.Minute).Should(gexec.Exit(0))
+	Eventually(session).Should(gexec.Exit(0))
 
 	// Deploy Istio's Virtual Service CRD
 	session, err = kubectl.Run("apply", "-f", "../integration/fixtures/istio-virtual-service.yaml")
 	Expect(err).NotTo(HaveOccurred())
-	Eventually(session, 1*time.Minute).Should(gexec.Exit(0))
+	Eventually(session).Should(gexec.Exit(0))
 })
 
 type kubectlRunner struct {
@@ -61,4 +67,27 @@ func (k kubectlRunner) generateCommand(stdin io.Reader, kubectlCommandArgs ...st
 	}
 
 	return cmd
+}
+
+func (k kubectlRunner) GetNumberOf(resourceName string) int {
+	session, err := k.Run("get", resourceName, "--no-headers")
+	if err != nil {
+		return 0
+	}
+
+	session.Wait(5 * time.Minute)
+
+	if session.ExitCode() != 0 {
+		return 0
+	}
+
+	return strings.Count(string(session.Out.Contents()), "\n")
+}
+
+type yttRunner struct {
+}
+
+func (y yttRunner) Run(yttCommandArgs ...string) (*gexec.Session, error) {
+	cmd := exec.Command("ytt", yttCommandArgs...)
+	return gexec.Start(cmd, GinkgoWriter, GinkgoWriter)
 }
