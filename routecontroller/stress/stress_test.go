@@ -2,10 +2,7 @@ package stress_test
 
 import (
 	"bytes"
-	"fmt"
 	"path/filepath"
-	"strings"
-	"text/template"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -16,46 +13,12 @@ import (
 
 var _ = Describe("Stress Tests", func() {
 	var (
-		numberOfRoutes = 100
+		numberOfRoutes = 400
 	)
 
 	BeforeEach(func() {
-		routeTmpl, err := template.ParseFiles("fixtures/route_template.yml")
-		Expect(err).NotTo(HaveOccurred())
-
-		type Route struct {
-			Name            string
-			Host            string
-			Path            string
-			Domain          string
-			DestinationGUID string
-			AppGUID         string
-		}
-
-		var routesBuilder strings.Builder
-
-		for i := 0; i < numberOfRoutes; i++ {
-			route := Route{
-				Name:            fmt.Sprintf("route-%d", i),
-				Host:            fmt.Sprintf("hostname-%d", i),
-				Path:            fmt.Sprintf("/%d", i),
-				Domain:          "apps.example.com",
-				DestinationGUID: fmt.Sprintf("destination-guid-%d", i),
-				AppGUID:         fmt.Sprintf("app-guid-%d", i),
-			}
-
-			// Create a new YAML document for each Route definition
-			_, err := routesBuilder.WriteString("---\n")
-			Expect(err).NotTo(HaveOccurred())
-
-			// Evaluate the Route template and write the resulting Route definition to routesBuilder
-			err = routeTmpl.Execute(&routesBuilder, route)
-			Expect(err).NotTo(HaveOccurred())
-		}
-
-		routesReader := strings.NewReader(routesBuilder.String())
-
-		session, err := kubectl.RunWithStdin(routesReader, "apply", "-f", "-")
+		routes := buildRoutes(numberOfRoutes)
+		session, err := kubectl.RunWithStdin(routes, "apply", "-f", "-")
 		Expect(err).NotTo(HaveOccurred())
 		Eventually(session).Should(gexec.Exit(0))
 
@@ -107,5 +70,5 @@ var _ = Describe("Stress Tests", func() {
 			// Heisenberg's VirtualServices? Does running 'get' interfere with routecontroller's processing?
 			Eventually(func() int { return kubectl.GetNumberOf("virtualservices") }, 30*time.Minute, 500*time.Millisecond).Should(Equal(numberOfRoutes))
 		})
-	}, 2)
+	}, 1)
 })

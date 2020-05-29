@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
+	"text/template"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -93,4 +94,41 @@ func (y yttRunner) Run(yttCommandArgs ...string) (*gexec.Session, error) {
 	fmt.Fprintf(GinkgoWriter, "+ ytt %s\n", strings.Join(yttCommandArgs, " "))
 	cmd := exec.Command("ytt", yttCommandArgs...)
 	return gexec.Start(cmd, GinkgoWriter, GinkgoWriter)
+}
+
+func buildRoutes(numberOfRoutes int) io.Reader {
+	routeTmpl, err := template.ParseFiles("fixtures/route_template.yml")
+	Expect(err).NotTo(HaveOccurred())
+
+	type Route struct {
+		Name            string
+		Host            string
+		Path            string
+		Domain          string
+		DestinationGUID string
+		AppGUID         string
+	}
+
+	var routesBuilder strings.Builder
+
+	for i := 0; i < numberOfRoutes; i++ {
+		route := Route{
+			Name:            fmt.Sprintf("route-%d", i),
+			Host:            fmt.Sprintf("hostname-%d", i),
+			Path:            fmt.Sprintf("/%d", i),
+			Domain:          "apps.example.com",
+			DestinationGUID: fmt.Sprintf("destination-guid-%d", i),
+			AppGUID:         fmt.Sprintf("app-guid-%d", i),
+		}
+
+		// Create a new YAML document for each Route definition
+		_, err := routesBuilder.WriteString("---\n")
+		Expect(err).NotTo(HaveOccurred())
+
+		// Evaluate the Route template and write the resulting Route definition to routesBuilder
+		err = routeTmpl.Execute(&routesBuilder, route)
+		Expect(err).NotTo(HaveOccurred())
+	}
+
+	return strings.NewReader(routesBuilder.String())
 }
