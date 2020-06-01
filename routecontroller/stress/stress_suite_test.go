@@ -3,7 +3,8 @@ package stress_test
 import (
 	"fmt"
 	"io"
-	"os"
+	"io/ioutil"
+	"math/rand"
 	"os/exec"
 	"strings"
 	"testing"
@@ -13,6 +14,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gexec"
+	"sigs.k8s.io/kind/pkg/cluster"
 )
 
 func TestStress(t *testing.T) {
@@ -28,13 +30,7 @@ var (
 var _ = BeforeSuite(func() {
 	SetDefaultEventuallyTimeout(5 * time.Minute)
 
-	kubeconfigFromEnv := os.Getenv("KUBECONFIG")
-	if kubeconfigFromEnv == "" {
-		// TODO: Default to $HOME/.kube/config ?
-		Fail("Required environment variable KUBECONFIG was not set.")
-	}
-
-	kubectl = kubectlRunner{kubeconfigFilePath: kubeconfigFromEnv}
+	kubectl = CreateKindCluster()
 
 	// Deploy Route CRD
 	session, err := kubectl.Run("apply", "-f", "../../config/crd/networking.cloudfoundry.org_routes.yaml")
@@ -47,8 +43,44 @@ var _ = BeforeSuite(func() {
 	Eventually(session).Should(gexec.Exit(0))
 })
 
+var _ = AfterSuite(func() {
+	kubectl.DestroyCluster()
+})
+
 type kubectlRunner struct {
 	kubeconfigFilePath string
+	clusterName        string
+}
+
+func CreateKindCluster() kubectlRunner {
+	name := fmt.Sprintf("stress-tests-%d", rand.Uint64())
+	provider := cluster.NewProvider()
+	err := provider.Create(name)
+	// retry once
+	if err != nil {
+		time.Sleep(5 * time.Second)
+		err = provider.Create(name)
+	}
+
+	Expect(err).NotTo(HaveOccurred())
+
+	kubeConfig, err := provider.KubeConfig(name, false)
+	Expect(err).NotTo(HaveOccurred())
+
+	kubeConfigFile, err := ioutil.TempFile("", fmt.Sprintf("kubeconfig-%s", name))
+	Expect(err).NotTo(HaveOccurred())
+	defer kubeConfigFile.Close()
+
+	_, err = kubeConfigFile.Write([]byte(kubeConfig))
+	Expect(err).NotTo(HaveOccurred())
+
+	return kubectlRunner{clusterName: name, kubeconfigFilePath: kubeConfigFile.Name()}
+}
+
+func (k kubectlRunner) DestroyCluster() {
+	provider := cluster.NewProvider()
+	err := provider.Delete(k.clusterName, k.kubeconfigFilePath)
+	Expect(err).NotTo(HaveOccurred())
 }
 
 func (k kubectlRunner) Run(kubectlCommandArgs ...string) (*gexec.Session, error) {

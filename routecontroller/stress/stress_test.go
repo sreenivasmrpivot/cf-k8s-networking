@@ -2,6 +2,7 @@ package stress_test
 
 import (
 	"bytes"
+	"fmt"
 	"path/filepath"
 	"time"
 
@@ -13,7 +14,7 @@ import (
 
 var _ = Describe("Stress Tests", func() {
 	var (
-		numberOfRoutes = 400
+		numberOfRoutes = 100
 	)
 
 	BeforeEach(func() {
@@ -26,18 +27,11 @@ var _ = Describe("Stress Tests", func() {
 	})
 
 	AfterEach(func() {
-		// // Note: Eventually this should be captured as a measurement
-		// session, err := kubectl.Run("delete", "routes", "--all")
-		// Expect(err).NotTo(HaveOccurred())
-		// Eventually(session).Should(gexec.Exit(0))
-
 		session, err := kubectl.Run("delete", "deployment", "routecontroller")
 		Expect(err).NotTo(HaveOccurred())
 		Eventually(session).Should(gexec.Exit(0))
 
-		session, err = kubectl.Run("delete", "virtualservices", "--all")
-		Expect(err).NotTo(HaveOccurred())
-		Eventually(session).Should(gexec.Exit(0))
+		Eventually(func() int { return kubectl.GetNumberOf("pods") }).Should(Equal(0))
 	})
 
 	Measure("routecontroller stress", func(b Benchmarker) {
@@ -53,10 +47,10 @@ var _ = Describe("Stress Tests", func() {
 		Eventually(yttSession).Should(gexec.Exit(0))
 		// TODO: why do we need to get Contents() ?
 		yttContents := yttSession.Out.Contents()
-		testReader := bytes.NewReader(yttContents)
+		yttReader := bytes.NewReader(yttContents)
 
 		b.Time("Deploying the routecontroller", func() {
-			session, err := kubectl.RunWithStdin(testReader, "apply", "-f", "-")
+			session, err := kubectl.RunWithStdin(yttReader, "apply", "-f", "-")
 			Expect(err).NotTo(HaveOccurred())
 			Eventually(session).Should(gexec.Exit(0))
 
@@ -66,9 +60,22 @@ var _ = Describe("Stress Tests", func() {
 			Eventually(session).Should(gexec.Exit(0))
 		})
 
-		b.Time("Processing 1000 new routes at once", func() {
-			// Heisenberg's VirtualServices? Does running 'get' interfere with routecontroller's processing?
+		b.Time(fmt.Sprintf("Processing %d new routes at once", numberOfRoutes), func() {
 			Eventually(func() int { return kubectl.GetNumberOf("virtualservices") }, 30*time.Minute, 500*time.Millisecond).Should(Equal(numberOfRoutes))
 		})
-	}, 1)
+
+		b.Time(fmt.Sprintf("Deleting %d routes at once", numberOfRoutes), func() {
+			session, err := kubectl.Run("delete", "routes", "--all", "--wait=false")
+			Expect(err).NotTo(HaveOccurred())
+			Eventually(session).Should(gexec.Exit(0))
+
+			Eventually(func() int {
+				return kubectl.GetNumberOf("routes")
+			}, 30*time.Minute, 500*time.Millisecond).Should(Equal(0))
+
+			Eventually(func() int {
+				return kubectl.GetNumberOf("virtualservices")
+			}, 30*time.Minute, 500*time.Millisecond).Should(Equal(0))
+		})
+	}, 2)
 })
