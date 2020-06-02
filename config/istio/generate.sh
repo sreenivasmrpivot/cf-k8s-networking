@@ -18,5 +18,5 @@ istioctl manifest generate -f "${SCRIPT_DIR}/istio-values-gen.yaml" "$@" > "${SC
 
 ytt --ignore-unknown-comments \
   -f "${SCRIPT_DIR}/ytt-data-values.yaml" \
-  -f "${SCRIPT_DIR}/tmp/generated-istio.yaml" 
-  # -f "${SCRIPT_DIR}/overlays"
+  -f "${SCRIPT_DIR}/tmp/generated-istio.yaml" \
+  -f "${SCRIPT_DIR}/overlays"

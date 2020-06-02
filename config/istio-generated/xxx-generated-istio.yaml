@@ -5289,7 +5289,7 @@ spec:
     storage: true
 ---
 apiVersion: apps/v1
-kind: Deployment
+kind: DaemonSet
 metadata:
   annotations:
     kbld.k14s.io/images: |
@@ -5309,10 +5309,6 @@ spec:
     matchLabels:
       app: istio-ingressgateway
       istio: ingressgateway
-  strategy:
-    rollingUpdate:
-      maxSurge: 100%
-      maxUnavailable: 25%
   template:
     metadata:
       annotations:
@@ -5439,6 +5435,10 @@ spec:
         - containerPort: 15090
           name: http-envoy-prom
           protocol: TCP
+        - containerPort: 80
+          hostPort: 80
+        - containerPort: 443
+          hostPort: 443
         readinessProbe:
           failureThreshold: 30
           httpGet:
@@ -5513,10 +5513,15 @@ spec:
         secret:
           optional: true
           secretName: istio-ingressgateway-ca-certs
+  updateStrategy:
+    rollingUpdate:
+      maxUnavailable: 1
 ---
 apiVersion: policy/v1beta1
 kind: PodDisruptionBudget
 metadata:
+  annotations:
+    kapp.k14s.io/update-strategy: fallback-on-replace
   labels:
     app: istio-ingressgateway
     istio: ingressgateway
@@ -6460,7 +6465,6 @@ metadata:
   name: istio-sidecar-injector
 webhooks:
 - clientConfig:
-    caBundle: ""
     service:
       name: istiod
       namespace: istio-system
@@ -6483,6 +6487,8 @@ webhooks:
 apiVersion: policy/v1beta1
 kind: PodDisruptionBudget
 metadata:
+  annotations:
+    kapp.k14s.io/update-strategy: fallback-on-replace
   labels:
     app: istiod
     istio: pilot
@@ -7248,3 +7254,125 @@ spec:
                     inline_string: envoy.wasm.stats
                 runtime: envoy.wasm.runtime.null
                 vm_id: tcp_stats_outbound
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: pilot-network-policy
+  namespace: istio-system
+spec:
+  ingress:
+  - ports:
+    - port: 15004
+    - port: 15010
+    - port: 15011
+    - port: 15014
+  podSelector:
+    matchLabels:
+      app: pilot
+  policyTypes:
+  - Ingress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: citadel-network-policy
+  namespace: istio-system
+spec:
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          cf-for-k8s.cloudfoundry.org/istio-system-ns: ""
+    ports:
+    - port: 8060
+    - port: 8080
+  - ports:
+    - port: 15014
+  podSelector:
+    matchLabels:
+      app: citadel
+  policyTypes:
+  - Ingress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: mixer-network-policy
+  namespace: istio-system
+spec:
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          cf-for-k8s.cloudfoundry.org/istio-system-ns: ""
+    ports:
+    - port: 9091
+    - port: 15004
+    - port: 15090
+    - port: 42422
+  - ports:
+    - port: 15014
+  podSelector:
+    matchLabels:
+      app: mixer
+  policyTypes:
+  - Ingress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: sidecar-injector-network-policy
+  namespace: istio-system
+spec:
+  ingress:
+  - ports:
+    - port: 9443
+    - port: 15014
+  podSelector:
+    matchLabels:
+      app: sidecarInjectorWebhook
+  policyTypes:
+  - Ingress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ingressgateway-network-policy-pilot
+  namespace: istio-system
+spec:
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          cf-for-k8s.cloudfoundry.org/istio-system-ns: ""
+    ports:
+    - port: 15443
+    - port: 15020
+  - ports:
+    - port: 80
+    - port: 443
+  podSelector:
+    matchLabels:
+      app: istio-ingressgateway
+  policyTypes:
+  - Ingress
+---
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: default
+  namespace: istio-system
+spec:
+  mtls:
+    mode: STRICT
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: Sidecar
+metadata:
+  name: default
+  namespace: cf-workloads
+spec:
+  egress:
+  - hosts:
+    - cf-system/*
