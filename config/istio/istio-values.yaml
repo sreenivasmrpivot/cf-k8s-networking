@@ -13,6 +13,16 @@ spec:
           requests:
             cpu: 100m
             memory: 500Mi
+#!    ingressGateways:
+#!      - k8s:
+#!          hpaSpec:
+#!            maxReplicas: 1
+#!            minReplicas: 1
+#!    egressGateways:
+#!      - k8s:
+#!          hpaSpec:
+#!            maxReplicas: 1
+#!            minReplicas: 1
   meshConfig:
     tcpKeepalive:
       time: 300s
@@ -73,28 +83,26 @@ spec:
 #! Add HorizontalPodAutoscaler configuration for all components
 
 #@ def components():
-trafficManagement: [pilot, proxy]
+trafficManagement: [pilot, proxy, istiodRemote]
 policy: [policy]
 telemetry: [telemetry]
 security: [citadel, certManager, nodeAgent]
 configManagement: [galley]
-autoInjection: [injector]
-gateways: [ingressGateway, egressGateway]
+autoInjection: [sidecarInjector]
 cni: [cni]
 coreDNS: [coreDNS]
 #@ end
 
-#@overlay/match by=overlay.all
-#@overlay/match-child-defaults missing_ok=True
----
-spec:
-  #@yaml/text-templated-strings
-  #@ for/end compName, subComps in yaml.decode(yaml.encode(components())).items():
-  (@= compName @):
-    components:
-      #@ for/end subCompName in subComps:
-      (@= subCompName @):
-        k8s:
-          hpaSpec:
-            maxReplicas: 1
-            minReplicas: 1
+#! #@overlay/match by=overlay.all
+#! #@overlay/match-child-defaults missing_ok=True
+#! ---
+#! spec:
+#!   #@yaml/text-templated-strings
+#!   #@ for/end compName, subComps in yaml.decode(yaml.encode(components())).items():
+#!   components:
+#!     #@ for/end subCompName in subComps:
+#!     (@= subCompName @):
+#!       k8s:
+#!         hpaSpec:
+#!           maxReplicas: 1
+#!           minReplicas: 1

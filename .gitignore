@@ -13,5 +13,4 @@ tags
 .DS_Store
 *.coverprofile
 cfroutesync/integration/.kube
-ci/scale/scale*
 .kube

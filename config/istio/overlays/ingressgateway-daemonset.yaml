@@ -16,11 +16,11 @@ spec:
       containers:
       #@overlay/match by=overlay.subset({"name":"istio-proxy"}),expects=1
       - ports:
-        #@overlay/match by=overlay.subset({"containerPort":80}),expects=1
+        #@overlay/match by=overlay.subset({"containerPort":80}),expects="0+"
         - containerPort: 80
           #@overlay/match missing_ok=True
           hostPort: 80
-        #@overlay/match by=overlay.subset({"containerPort":443}),expects=1
+        #@overlay/match by=overlay.subset({"containerPort":443}),expects="0+"
         - containerPort: 443
           #@overlay/match missing_ok=True
           hostPort: 443
