@@ -1,4 +1,248 @@
 ---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    kbld.k14s.io/images: |
+      - Metas:
+        - Tag: "1.16"
+          Type: resolved
+          URL: docker.io/jaegertracing/all-in-one:1.16
+        URL: index.docker.io/jaegertracing/all-in-one@sha256:738442983b772a5d413c8a2c44a5563956adaff224e5b38f52a959124dafc119
+  labels:
+    app: jaeger
+    release: istio
+  name: istio-tracing
+  namespace: istio-system
+spec:
+  selector:
+    matchLabels:
+      app: jaeger
+  template:
+    metadata:
+      annotations:
+        prometheus.io/port: "14269"
+        prometheus.io/scrape: "true"
+        sidecar.istio.io/inject: "false"
+      labels:
+        app: jaeger
+        release: istio
+    spec:
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - preference:
+              matchExpressions:
+              - key: beta.kubernetes.io/arch
+                operator: In
+                values:
+                - amd64
+            weight: 2
+          - preference:
+              matchExpressions:
+              - key: beta.kubernetes.io/arch
+                operator: In
+                values:
+                - ppc64le
+            weight: 2
+          - preference:
+              matchExpressions:
+              - key: beta.kubernetes.io/arch
+                operator: In
+                values:
+                - s390x
+            weight: 2
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: beta.kubernetes.io/arch
+                operator: In
+                values:
+                - amd64
+                - ppc64le
+                - s390x
+      containers:
+      - env:
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+        - name: BADGER_EPHEMERAL
+          value: "false"
+        - name: SPAN_STORAGE_TYPE
+          value: badger
+        - name: BADGER_DIRECTORY_VALUE
+          value: /badger/data
+        - name: BADGER_DIRECTORY_KEY
+          value: /badger/key
+        - name: COLLECTOR_ZIPKIN_HTTP_PORT
+          value: "9411"
+        - name: MEMORY_MAX_TRACES
+          value: "50000"
+        - name: QUERY_BASE_PATH
+          value: /jaeger
+        image: index.docker.io/jaegertracing/all-in-one@sha256:738442983b772a5d413c8a2c44a5563956adaff224e5b38f52a959124dafc119
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 14269
+        name: jaeger
+        ports:
+        - containerPort: 9411
+        - containerPort: 16686
+        - containerPort: 14250
+        - containerPort: 14267
+        - containerPort: 14268
+        - containerPort: 14269
+        - containerPort: 5775
+          protocol: UDP
+        - containerPort: 6831
+          protocol: UDP
+        - containerPort: 6832
+          protocol: UDP
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 14269
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /badger
+          name: data
+      volumes:
+      - emptyDir: {}
+        name: data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations: null
+  labels:
+    app: jaeger
+    jaeger-infra: jaeger-service
+    release: istio
+  name: jaeger-query
+  namespace: istio-system
+spec:
+  ports:
+  - name: query-http
+    port: 16686
+    protocol: TCP
+    targetPort: 16686
+  selector:
+    app: jaeger
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: jaeger
+    jaeger-infra: collector-service
+    release: istio
+  name: jaeger-collector
+  namespace: istio-system
+spec:
+  ports:
+  - name: jaeger-collector-tchannel
+    port: 14267
+    protocol: TCP
+    targetPort: 14267
+  - name: jaeger-collector-http
+    port: 14268
+    protocol: TCP
+    targetPort: 14268
+  - name: jaeger-collector-grpc
+    port: 14250
+    protocol: TCP
+    targetPort: 14250
+  selector:
+    app: jaeger
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: jaeger
+    jaeger-infra: collector-service
+    release: istio
+  name: jaeger-collector-headless
+  namespace: istio-system
+spec:
+  clusterIP: None
+  ports:
+  - name: jaeger-collector-grpc
+    port: 14250
+    protocol: TCP
+    targetPort: 14250
+  selector:
+    app: jaeger
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: jaeger
+    jaeger-infra: agent-service
+    release: istio
+  name: jaeger-agent
+  namespace: istio-system
+spec:
+  clusterIP: None
+  ports:
+  - name: agent-zipkin-thrift
+    port: 5775
+    protocol: UDP
+    targetPort: 5775
+  - name: agent-compact
+    port: 6831
+    protocol: UDP
+    targetPort: 6831
+  - name: agent-binary
+    port: 6832
+    protocol: UDP
+    targetPort: 6832
+  selector:
+    app: jaeger
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: jaeger
+    release: istio
+  name: zipkin
+  namespace: istio-system
+spec:
+  ports:
+  - name: http-query
+    port: 9411
+    protocol: TCP
+    targetPort: 9411
+  selector:
+    app: jaeger
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations: null
+  labels:
+    app: jaeger
+    release: istio
+  name: tracing
+  namespace: istio-system
+spec:
+  ports:
+  - name: http-query
+    port: 80
+    protocol: TCP
+    targetPort: 16686
+  selector:
+    app: jaeger
+  type: ClusterIP
+---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -5296,8 +5540,8 @@ metadata:
       - Metas:
         - Tag: 1.6.0
           Type: resolved
-          URL: docker.io/istio/proxyv2:1.6.0
-        URL: index.docker.io/istio/proxyv2@sha256:821cc14ad9a29a2cafb9e351d42096455c868f3e628376f1d0e1763c3ce72ca6
+          URL: gcr.io/cf-routing-desserts/proxyv2:1.6.0
+        URL: gcr.io/cf-routing-desserts/proxyv2@sha256:2ce4d490744c617c8230132a1981b0367e55d5da7edcd415bed1ae280313af61
   labels:
     app: istio-ingressgateway
     istio: ingressgateway
@@ -5421,7 +5665,7 @@ spec:
           value: sni-dnat
         - name: ISTIO_META_CLUSTER_ID
           value: Kubernetes
-        image: index.docker.io/istio/proxyv2@sha256:821cc14ad9a29a2cafb9e351d42096455c868f3e628376f1d0e1763c3ce72ca6
+        image: gcr.io/cf-routing-desserts/proxyv2@sha256:2ce4d490744c617c8230132a1981b0367e55d5da7edcd415bed1ae280313af61
         name: istio-proxy
         ports:
         - containerPort: 15021
@@ -7254,109 +7498,6 @@ spec:
                     inline_string: envoy.wasm.stats
                 runtime: envoy.wasm.runtime.null
                 vm_id: tcp_stats_outbound
----
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: pilot-network-policy
-  namespace: istio-system
-spec:
-  ingress:
-  - ports:
-    - port: 15004
-    - port: 15010
-    - port: 15011
-    - port: 15014
-  podSelector:
-    matchLabels:
-      app: pilot
-  policyTypes:
-  - Ingress
----
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: citadel-network-policy
-  namespace: istio-system
-spec:
-  ingress:
-  - from:
-    - namespaceSelector:
-        matchLabels:
-          cf-for-k8s.cloudfoundry.org/istio-system-ns: ""
-    ports:
-    - port: 8060
-    - port: 8080
-  - ports:
-    - port: 15014
-  podSelector:
-    matchLabels:
-      app: citadel
-  policyTypes:
-  - Ingress
----
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: mixer-network-policy
-  namespace: istio-system
-spec:
-  ingress:
-  - from:
-    - namespaceSelector:
-        matchLabels:
-          cf-for-k8s.cloudfoundry.org/istio-system-ns: ""
-    ports:
-    - port: 9091
-    - port: 15004
-    - port: 15090
-    - port: 42422
-  - ports:
-    - port: 15014
-  podSelector:
-    matchLabels:
-      app: mixer
-  policyTypes:
-  - Ingress
----
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: sidecar-injector-network-policy
-  namespace: istio-system
-spec:
-  ingress:
-  - ports:
-    - port: 9443
-    - port: 15014
-  podSelector:
-    matchLabels:
-      app: sidecarInjectorWebhook
-  policyTypes:
-  - Ingress
----
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: ingressgateway-network-policy-pilot
-  namespace: istio-system
-spec:
-  ingress:
-  - from:
-    - namespaceSelector:
-        matchLabels:
-          cf-for-k8s.cloudfoundry.org/istio-system-ns: ""
-    ports:
-    - port: 15443
-    - port: 15020
-  - ports:
-    - port: 80
-    - port: 443
-  podSelector:
-    matchLabels:
-      app: istio-ingressgateway
-  policyTypes:
-  - Ingress
 ---
 apiVersion: security.istio.io/v1beta1
 kind: PeerAuthentication
