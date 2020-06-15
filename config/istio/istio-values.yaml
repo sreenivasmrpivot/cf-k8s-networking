@@ -10,6 +10,12 @@ spec:
       - name: istio-ingressgateway
         enabled: true
         k8s:
+          overlays:
+          - kind: Deployment
+            name: istio-ingressgateway
+            patches:
+              - path: spec.replicas
+                value: 20
           hpaSpec:
             minReplicas: 1
             maxReplicas: 1
@@ -30,6 +36,12 @@ spec:
               targetPort: 15443
     pilot:
       k8s:
+        overlays:
+          - kind: Deployment
+            name: istiod
+            patches:
+              - path: spec.replicas
+                value: 20
         hpaSpec:
           minReplicas: 1
           maxReplicas: 1
